@@ -226,7 +226,16 @@
     letter-spacing: 1px;
     background: var(--surface2);
     border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color 0.15s;
   }
+  thead th:hover { color: var(--text); }
+  thead th.sort-asc  { color: var(--accent2); }
+  thead th.sort-desc { color: var(--accent2); }
+  thead th.sort-asc::after  { content: ' ↑'; }
+  thead th.sort-desc::after { content: ' ↓'; }
   tbody tr {
     border-bottom: 1px solid var(--border);
     transition: background 0.15s;
@@ -274,18 +283,16 @@
   .rep-bar-item {
     display: flex;
     align-items: center;
+    flex-direction: row;
     gap: 12px;
     padding: 9px 0;
     border-bottom: 1px solid var(--border);
   }
   .rep-bar-item:last-child { border-bottom: none; }
   .rep-name { font-size: 13px; width: 130px; flex-shrink: 0; }
-  .rep-bar-wrap { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; display: flex; }
-  .rep-bar-fill { height: 100%; }
-  .rep-bar-fill:first-child { border-radius: 5px 0 0 5px; }
-  .rep-bar-fill:last-child  { border-radius: 0 5px 5px 0; }
-  .rep-bar-fill:only-child  { border-radius: 5px; }
-  .rep-bar-val { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); width: 70px; text-align: right; }
+  .rep-bar-wrap { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; display: flex; flex-direction: row; }
+  .rep-bar-fill { height: 10px; background: var(--accent); border-radius: 5px; flex-shrink: 0; }
+  .rep-bar-val { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); width: 70px; text-align: right; flex-shrink: 0; }
   .stage-legend {
     display: flex;
     gap: 16px;
@@ -642,8 +649,15 @@
     <div style="overflow-x:auto">
       <table>
         <thead>
-          <tr>
-            <th>Account</th><th>Rep</th><th>Quarter</th><th>Type</th><th>ARR</th><th>Segment</th><th>Days to Close</th><th>Discount</th>
+          <tr id="deals-thead">
+            <th onclick="sortTable('top-deals-body','deals-thead',0,'str')">Account</th>
+            <th onclick="sortTable('top-deals-body','deals-thead',1,'str')">Rep</th>
+            <th onclick="sortTable('top-deals-body','deals-thead',2,'str')">Quarter</th>
+            <th onclick="sortTable('top-deals-body','deals-thead',3,'str')">Type</th>
+            <th onclick="sortTable('top-deals-body','deals-thead',4,'num')">ARR</th>
+            <th onclick="sortTable('top-deals-body','deals-thead',5,'str')">Segment</th>
+            <th onclick="sortTable('top-deals-body','deals-thead',6,'num')">Days to Close</th>
+            <th onclick="sortTable('top-deals-body','deals-thead',7,'num')">Discount</th>
           </tr>
         </thead>
         <tbody id="top-deals-body"></tbody>
@@ -695,8 +709,17 @@
     <div style="overflow-x:auto">
       <table>
         <thead>
-          <tr>
-            <th>Account</th><th>Segment</th><th>Region</th><th>CSM</th><th>ARR</th><th>Health</th><th>Tickets</th><th>Days Since Login</th><th>Status</th><th>FY</th>
+          <tr id="risk-thead">
+            <th onclick="sortTable('risk-table-body','risk-thead',0,'str')">Account</th>
+            <th onclick="sortTable('risk-table-body','risk-thead',1,'str')">Segment</th>
+            <th onclick="sortTable('risk-table-body','risk-thead',2,'str')">Region</th>
+            <th onclick="sortTable('risk-table-body','risk-thead',3,'str')">CSM</th>
+            <th onclick="sortTable('risk-table-body','risk-thead',4,'num')">ARR</th>
+            <th onclick="sortTable('risk-table-body','risk-thead',5,'num')">Health</th>
+            <th onclick="sortTable('risk-table-body','risk-thead',6,'num')">Tickets</th>
+            <th onclick="sortTable('risk-table-body','risk-thead',7,'num')">Days Since Login</th>
+            <th onclick="sortTable('risk-table-body','risk-thead',8,'str')">Status</th>
+            <th onclick="sortTable('risk-table-body','risk-thead',9,'str')">FY</th>
           </tr>
         </thead>
         <tbody id="risk-table-body"></tbody>
@@ -711,8 +734,15 @@
     <div style="overflow-x:auto">
       <table>
         <thead>
-          <tr>
-            <th>Account</th><th>Segment</th><th>Region</th><th>CSM</th><th>ARR</th><th>Health</th><th>Days Since Login</th><th>Status</th>
+          <tr id="ontrack-thead">
+            <th onclick="sortTable('ontrack-table-body','ontrack-thead',0,'str')">Account</th>
+            <th onclick="sortTable('ontrack-table-body','ontrack-thead',1,'str')">Segment</th>
+            <th onclick="sortTable('ontrack-table-body','ontrack-thead',2,'str')">Region</th>
+            <th onclick="sortTable('ontrack-table-body','ontrack-thead',3,'str')">CSM</th>
+            <th onclick="sortTable('ontrack-table-body','ontrack-thead',4,'num')">ARR</th>
+            <th onclick="sortTable('ontrack-table-body','ontrack-thead',5,'num')">Health</th>
+            <th onclick="sortTable('ontrack-table-body','ontrack-thead',6,'num')">Days Since Login</th>
+            <th onclick="sortTable('ontrack-table-body','ontrack-thead',7,'str')">Status</th>
           </tr>
         </thead>
         <tbody id="ontrack-table-body"></tbody>
@@ -783,8 +813,16 @@
     <div style="overflow-x:auto">
       <table>
         <thead>
-          <tr>
-            <th>Account</th><th>Rep</th><th>Segment</th><th>Stage</th><th>ARR</th><th>Weighted</th><th>Close Date</th><th>Opp Age</th><th>Inactive Days</th>
+          <tr id="pipeline-thead">
+            <th onclick="sortTable('pipeline-table-body','pipeline-thead',0,'str')">Account</th>
+            <th onclick="sortTable('pipeline-table-body','pipeline-thead',1,'str')">Rep</th>
+            <th onclick="sortTable('pipeline-table-body','pipeline-thead',2,'str')">Segment</th>
+            <th onclick="sortTable('pipeline-table-body','pipeline-thead',3,'str')">Stage</th>
+            <th onclick="sortTable('pipeline-table-body','pipeline-thead',4,'num')">ARR</th>
+            <th onclick="sortTable('pipeline-table-body','pipeline-thead',5,'num')">Weighted</th>
+            <th onclick="sortTable('pipeline-table-body','pipeline-thead',6,'str')">Close Date</th>
+            <th onclick="sortTable('pipeline-table-body','pipeline-thead',7,'num')">Opp Age</th>
+            <th onclick="sortTable('pipeline-table-body','pipeline-thead',8,'num')">Inactive Days</th>
           </tr>
         </thead>
         <tbody id="pipeline-table-body"></tbody>
@@ -836,8 +874,19 @@
     <div style="overflow-x:auto">
       <table>
         <thead>
-          <tr>
-            <th>Rep</th><th>Segment</th><th>Region</th><th>Quarterly Quota</th><th>Total Booked ARR</th><th>Quota Periods</th><th>Total Quota</th><th>Attainment</th><th>Deals</th><th>Avg Deal Size</th><th>New Logo</th><th>Expansion</th>
+          <tr id="rep-scorecard-thead">
+            <th onclick="sortTable('rep-scorecard-body','rep-scorecard-thead',0,'str')">Rep</th>
+            <th onclick="sortTable('rep-scorecard-body','rep-scorecard-thead',1,'str')">Segment</th>
+            <th onclick="sortTable('rep-scorecard-body','rep-scorecard-thead',2,'str')">Region</th>
+            <th onclick="sortTable('rep-scorecard-body','rep-scorecard-thead',3,'num')">Quarterly Quota</th>
+            <th onclick="sortTable('rep-scorecard-body','rep-scorecard-thead',4,'num')">Total Booked ARR</th>
+            <th onclick="sortTable('rep-scorecard-body','rep-scorecard-thead',5,'num')">Quota Periods</th>
+            <th onclick="sortTable('rep-scorecard-body','rep-scorecard-thead',6,'num')">Total Quota</th>
+            <th onclick="sortTable('rep-scorecard-body','rep-scorecard-thead',7,'num')">Attainment</th>
+            <th onclick="sortTable('rep-scorecard-body','rep-scorecard-thead',8,'num')">Deals</th>
+            <th onclick="sortTable('rep-scorecard-body','rep-scorecard-thead',9,'num')">Avg Deal Size</th>
+            <th onclick="sortTable('rep-scorecard-body','rep-scorecard-thead',10,'num')">New Logo</th>
+            <th onclick="sortTable('rep-scorecard-body','rep-scorecard-thead',11,'num')">Expansion</th>
           </tr>
         </thead>
         <tbody id="rep-scorecard-body"></tbody>
@@ -1225,13 +1274,13 @@ function initPipeline() {
       .filter(s => data.stages[s])
       .map(s => {
         const pctOfTotal = (data.stages[s] / data.total * 100).toFixed(2);
-        return `<div title="${s}: ${fmt(data.stages[s])}" style="width:${pctOfTotal}%;height:100%;background:${STAGE_COLORS[s]};display:inline-block;vertical-align:top"></div>`;
+        return `<div title="${s}: ${fmt(data.stages[s])}" style="flex:0 0 ${pctOfTotal}%;height:10px;background:${STAGE_COLORS[s]}"></div>`;
       }).join('');
     return `
     <div class="rep-bar-item" onclick="drillRepPipeline('${name}')">
       <div class="rep-name">${name}</div>
-      <div style="flex:1;height:10px;background:var(--border);border-radius:5px;overflow:hidden;position:relative">
-        <div style="width:${totalPct}%;height:100%;display:flex;position:absolute;top:0;left:0">${segments}</div>
+      <div style="flex:1;height:10px;background:var(--border);border-radius:5px;overflow:hidden">
+        <div style="width:${totalPct}%;height:10px;display:flex;flex-direction:row">${segments}</div>
       </div>
       <div class="rep-bar-val">${fmt(data.total)}</div>
     </div>`;
@@ -1681,6 +1730,82 @@ function drillRepPipeline(rep) {
   const rows = filtered(RAW.pipeline).filter(d=>d['Rep Name']===rep).sort((a,b)=>b.opp_arr-a.opp_arr);
   const sl   = activeSegment==='All' ? 'Open opps · Q2 FY2027' : `${activeSegment} · open opps`;
   openModal(`${rep} — Pipeline`, sl, rows, pipelineCols, pipelineStats(rows));
+}
+
+// ===== SORTABLE TABLES =====
+const _sortState = {}; // { tableId: { col, dir } }
+
+function sortTable(tbodyId, theadId, colIdx, type) {
+  const tbody = document.getElementById(tbodyId);
+  const thead = document.getElementById(theadId);
+  if (!tbody || !thead) return;
+
+  // Toggle direction
+  const key = tbodyId;
+  const prev = _sortState[key] || {};
+  const dir = (prev.col === colIdx && prev.dir === 'desc') ? 'asc' : 'desc';
+  _sortState[key] = { col: colIdx, dir };
+
+  // Update header indicators
+  thead.querySelectorAll('th').forEach((th, i) => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (i === colIdx) th.classList.add(dir === 'asc' ? 'sort-asc' : 'sort-desc');
+  });
+
+  // Sort rows
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a, b) => {
+    const aCell = a.cells[colIdx];
+    const bCell = b.cells[colIdx];
+    if (!aCell || !bCell) return 0;
+    const aRaw = aCell.textContent.trim();
+    const bRaw = bCell.textContent.trim();
+
+    let aVal, bVal;
+    if (type === 'num') {
+      // Strip $, M, K, ×, %, d, commas then parse
+      const parse = s => {
+        const c = s.replace(/[$,×%d\s]/g,'');
+        if (c.endsWith('M')) return parseFloat(c) * 1e6;
+        if (c.endsWith('K')) return parseFloat(c) * 1e3;
+        return parseFloat(c) || 0;
+      };
+      aVal = parse(aRaw);
+      bVal = parse(bRaw);
+    } else {
+      aVal = aRaw.toLowerCase();
+      bVal = bRaw.toLowerCase();
+    }
+
+    if (aVal < bVal) return dir === 'asc' ? -1 : 1;
+    if (aVal > bVal) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// Make modal tables sortable when opened
+const _origOpenModal = openModal;
+function openModal(title, subtitle, rows, columns, stats) {
+  _origOpenModal(title, subtitle, rows, columns, stats);
+  // Wire up sortable headers in modal after render
+  setTimeout(() => {
+    const modalThead = document.querySelector('#modal-body thead tr');
+    const modalTbody = document.querySelector('#modal-body tbody');
+    if (!modalThead || !modalTbody) return;
+    modalTbody.id = 'modal-sort-body';
+    modalThead.id = 'modal-sort-thead';
+    // Infer type from column label
+    const numKeywords = ['arr','arR','weighted','age','days','quota','deal','logo','expansion','attain','ticket','health','count','period'];
+    modalThead.querySelectorAll('th').forEach((th, i) => {
+      const label = th.textContent.toLowerCase();
+      const type = numKeywords.some(k => label.includes(k)) ? 'num' : 'str';
+      th.style.cursor = 'pointer';
+      th.style.userSelect = 'none';
+      th.onclick = () => sortTable('modal-sort-body','modal-sort-thead', i, type);
+    });
+  }, 50);
 }
 
 // ===== INIT =====
