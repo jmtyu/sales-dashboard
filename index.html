@@ -1225,14 +1225,13 @@ function initPipeline() {
       .filter(s => data.stages[s])
       .map(s => {
         const pctOfTotal = (data.stages[s] / data.total * 100).toFixed(2);
-        return `<div class="rep-bar-fill" title="${s}: ${fmt(data.stages[s])}"
-          style="width:${pctOfTotal}%;background:${STAGE_COLORS[s]};opacity:0.85"></div>`;
+        return `<div title="${s}: ${fmt(data.stages[s])}" style="width:${pctOfTotal}%;height:100%;background:${STAGE_COLORS[s]};display:inline-block;vertical-align:top"></div>`;
       }).join('');
     return `
     <div class="rep-bar-item" onclick="drillRepPipeline('${name}')">
       <div class="rep-name">${name}</div>
-      <div class="rep-bar-wrap" style="--bar-pct:${totalPct}%">
-        <div style="display:flex;height:100%;width:${totalPct}%">${segments}</div>
+      <div style="flex:1;height:10px;background:var(--border);border-radius:5px;overflow:hidden;position:relative">
+        <div style="width:${totalPct}%;height:100%;display:flex;position:absolute;top:0;left:0">${segments}</div>
       </div>
       <div class="rep-bar-val">${fmt(data.total)}</div>
     </div>`;
