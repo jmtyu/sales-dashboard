@@ -830,6 +830,14 @@
 
 <!-- ===== REP VIEW ===== -->
 <div class="content" id="tab-reps">
+
+  <!-- FY filter bar -->
+  <div class="qtr-filter-bar" id="rep-fy-bar">
+    <span class="qtr-filter-label">Fiscal Year</span>
+    <button class="qtr-btn" id="rep-fy-all"  onclick="setRepFY('All')">All</button>
+    <button class="qtr-btn" id="rep-fy-2026" onclick="setRepFY('FY2026')">FY2026</button>
+    <button class="qtr-btn" id="rep-fy-2027" onclick="setRepFY('FY2027')">FY2027</button>
+  </div>
   <div class="kpi-row">
     <div class="kpi" style="--kpi-color: #4ade80">
       <div class="kpi-label">Team Attainment</div>
@@ -1353,20 +1361,46 @@ function initPipeline() {
 }
 
 // ===== REPS =====
+function setRepFY(fy) {
+  activeRepFY = fy;
+  ['rep-fy-all','rep-fy-2026','rep-fy-2027'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('active');
+  });
+  const activeId = { 'All': 'rep-fy-all', 'FY2026': 'rep-fy-2026', 'FY2027': 'rep-fy-2027' }[fy];
+  const activeEl = document.getElementById(activeId);
+  if (activeEl) activeEl.classList.add('active');
+
+  // Destroy rep charts and redraw
+  ['rep-attain','rep-quarterly'].forEach(k => {
+    if (chartRegistry[k]) { chartRegistry[k].destroy(); delete chartRegistry[k]; }
+  });
+  initReps();
+}
+
 function initReps() {
-  const b = filtered(RAW.bookings);
-  const quarters = ['2026-Q1','2026-Q2','2026-Q3','2026-Q4','2027-Q1'];
-  const numQuotas = 5; // 5 quarters of data
+  const FY_QUARTERS = {
+    'FY2026': ['2026-Q1','2026-Q2','2026-Q3','2026-Q4'],
+    'FY2027': ['2027-Q1'],
+    'All':    ['2026-Q1','2026-Q2','2026-Q3','2026-Q4','2027-Q1'],
+  };
+  const FY_QUOTA_PERIODS = { 'FY2026': 4, 'FY2027': 1, 'All': 5 };
+
+  const quarters   = FY_QUARTERS[activeRepFY];
+  const numQuotas  = FY_QUOTA_PERIODS[activeRepFY];
+  const fyLabel    = activeRepFY === 'All' ? 'FY2026 + FY2027' : activeRepFY;
+  const allB       = filtered(RAW.bookings);
+  const b          = allB.filter(d => quarters.includes(d['Fiscal Quarter']));
 
   // Build per-rep stats
   const repNames = Object.keys(QUOTAS);
   const repStats = repNames.map(rep => {
-    const deals = b.filter(d => d['Rep Name'] === rep);
-    const totalARR = deals.reduce((s,d) => s+d.arr, 0);
-    const q = QUOTAS[rep];
+    const deals     = b.filter(d => d['Rep Name'] === rep);
+    const totalARR  = deals.reduce((s,d) => s+d.arr, 0);
+    const q         = QUOTAS[rep];
     const totalQuota = q.quarterly * numQuotas;
     const attainment = totalQuota > 0 ? totalARR / totalQuota : 0;
-    const newLogo = deals.filter(d => d['Deal Type']==='New Logo').reduce((s,d) => s+d.arr, 0);
+    const newLogo   = deals.filter(d => d['Deal Type']==='New Logo').reduce((s,d) => s+d.arr, 0);
     const expansion = deals.filter(d => d['Deal Type']==='Expansion').reduce((s,d) => s+d.arr, 0);
     return { rep, segment: q.segment, region: q.region, quarterly: q.quarterly,
       totalQuota, totalARR, attainment, deals: deals.length,
@@ -1375,17 +1409,27 @@ function initReps() {
     .sort((a,b) => b.attainment - a.attainment);
 
   // KPIs
-  const avgAttain = repStats.reduce((s,r) => s+r.attainment, 0) / repStats.length;
-  const aboveQuota = repStats.filter(r => r.attainment >= 1);
-  const top = repStats[0];
+  const avgAttain   = repStats.length ? repStats.reduce((s,r) => s+r.attainment, 0) / repStats.length : 0;
+  const aboveQuota  = repStats.filter(r => r.attainment >= 1);
+  const top         = repStats[0];
   const totalQuotaAll = repStats.reduce((s,r) => s+r.totalQuota, 0);
 
   document.getElementById('rv-team-attain').textContent = pct(avgAttain);
   document.getElementById('rv-above').textContent = `${aboveQuota.length} / ${repStats.length}`;
-  document.getElementById('rv-above-sub').textContent = aboveQuota.map(r => r.rep.split(' ')[0]).join(', ');
+  document.getElementById('rv-above-sub').textContent = aboveQuota.map(r => r.rep.split(' ')[0]).join(', ') || '—';
   document.getElementById('rv-top-rep').textContent = top ? top.rep.split(' ')[0] : '—';
   document.getElementById('rv-top-sub').textContent = top ? `${pct(top.attainment)} attainment` : '—';
   document.getElementById('rv-total-quota').textContent = fmt(totalQuotaAll);
+
+  // Update dynamic labels
+  const attainBadge = document.querySelector('#tab-reps .chart-badge');
+  if (attainBadge) attainBadge.textContent = fyLabel;
+  const tableTitle = document.querySelector('#tab-reps .table-title');
+  if (tableTitle) tableTitle.textContent = `👤 Rep Scorecard — ${fyLabel}`;
+  const kpiSub = document.querySelector('#tab-reps .kpi:first-child .kpi-sub');
+  if (kpiSub) kpiSub.textContent = `Avg across all reps · ${fyLabel}`;
+  const quotaSub = document.querySelector('#tab-reps .kpi:last-child .kpi-sub');
+  if (quotaSub) quotaSub.textContent = `Across all reps · ${numQuotas} quarter${numQuotas > 1 ? 's' : ''}`;
 
   // Attainment bar chart
   const attainColors = repStats.map(r =>
@@ -1397,15 +1441,12 @@ function initReps() {
     type: 'bar',
     data: {
       labels: repStats.map(r => r.rep.split(' ')[0]),
-      datasets: [
-        { label: 'Attainment', data: repStats.map(r => +(r.attainment*100).toFixed(1)), backgroundColor: attainColors, borderRadius: 4 },
-      ]
+      datasets: [{ label: 'Attainment', data: repStats.map(r => +(r.attainment*100).toFixed(1)), backgroundColor: attainColors, borderRadius: 4 }]
     },
     options: {
       ...CHART_DEFAULTS,
       plugins: { ...CHART_DEFAULTS.plugins,
-        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: { label: ctx => ` ${ctx.raw}% attainment` } },
-        annotation: {}
+        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: { label: ctx => ` ${ctx.raw}% attainment` } }
       },
       scales: {
         x: { ...CHART_DEFAULTS.scales.x },
@@ -1413,23 +1454,22 @@ function initReps() {
       }
     }
   });
-  // Quota line annotation (manual)
   chartRegistry['rep-attain'].options.onClick = (evt, elements) => {
     if (!elements.length) return;
     const r = repStats[elements[0].index];
-    const deals = b.filter(d => d['Rep Name'] === r.rep).sort((a,b) => b.arr - a.arr);
-    openModal(`${r.rep}`, `${r.segment} · ${r.region} · ${pct(r.attainment)} attainment`, deals, bookingCols, [
-      { label: 'Total ARR', value: fmt(r.totalARR) },
+    const deals = b.filter(d => d['Rep Name'] === r.rep).sort((a,bk) => bk.arr - a.arr);
+    openModal(`${r.rep} — ${fyLabel}`, `${r.segment} · ${r.region} · ${pct(r.attainment)} attainment`, deals, bookingCols, [
+      { label: 'Total ARR',   value: fmt(r.totalARR) },
       { label: 'Total Quota', value: fmt(r.totalQuota) },
-      { label: 'Attainment', value: pct(r.attainment) },
-      { label: 'Deals', value: r.deals },
-      { label: 'Avg Deal', value: fmt(r.avgDeal) },
+      { label: 'Attainment',  value: pct(r.attainment) },
+      { label: 'Deals',       value: r.deals },
+      { label: 'Avg Deal',    value: fmt(r.avgDeal) },
     ]);
   };
   chartRegistry['rep-attain'].update();
 
-  // Quarterly team ARR trend
-  const qTotals = quarters.map(q => b.filter(d => d['Fiscal Quarter']===q).reduce((s,d) => s+d.arr, 0));
+  // Quarterly ARR vs quota trend
+  const qTotals = quarters.map(q => allB.filter(d => d['Fiscal Quarter']===q).reduce((s,d) => s+d.arr, 0));
   const qQuota  = quarters.map(() => repStats.reduce((s,r) => s+r.quarterly, 0));
   chartRegistry['rep-quarterly'] = new Chart(document.getElementById('chart-rep-quarterly'), {
     type: 'bar',
@@ -1479,6 +1519,7 @@ let activeSegment = 'All';
 let activeQuarter = null;
 let activeRenewalStatus = null;  // null = all, or e.g. 'On Track'
 let activeHealthBucket = null;   // null = all, or index 0-4
+let activeRepFY = 'All';         // 'All', 'FY2026', or 'FY2027'
 const chartRegistry = {};
 
 function filtered(dataset) {
@@ -1627,6 +1668,7 @@ function setSegment(seg) {
   activeQuarter = null;
   activeRenewalStatus = null;
   activeHealthBucket = null;
+  activeRepFY = 'All';
   const quarters2 = ['2026-Q1','2026-Q2','2026-Q3','2026-Q4','2027-Q1'];
   quarters2.forEach(qi => { const b = document.getElementById(`qtr-${qi}`); if(b) b.classList.remove('active'); });
   const clr = document.getElementById('qtr-clear'); if(clr) clr.classList.remove('visible');
