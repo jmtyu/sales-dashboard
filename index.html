@@ -285,9 +285,14 @@
     align-items: center;
     flex-direction: row;
     gap: 12px;
-    padding: 9px 0;
+    padding: 9px 6px;
+    margin: 0 -6px;
     border-bottom: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
   }
+  .rep-bar-item:hover { background: var(--surface2); }
   .rep-bar-item:last-child { border-bottom: none; }
   .rep-name { font-size: 13px; width: 130px; flex-shrink: 0; }
   .rep-bar-wrap { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; display: flex; flex-direction: row; }
@@ -543,8 +548,6 @@
     gap: 4px;
   }
   .click-hint::before { content: '↗'; font-size: 11px; color: var(--accent); }
-  .rep-bar-item { cursor: pointer; border-radius: 6px; padding: 8px 6px; margin: 0 -6px; }
-  .rep-bar-item:hover { background: var(--surface2); }
 </style>
 </head>
 <body>
@@ -668,6 +671,23 @@
 
 <!-- ===== RENEWALS ===== -->
 <div class="content" id="tab-renewals">
+
+  <!-- Renewal filter bar -->
+  <div class="qtr-filter-bar" id="renewal-filter-bar">
+    <span class="qtr-filter-label">Status</span>
+    <button class="qtr-btn" id="rf-Renewed"   onclick="setRenewalFilter('status','Renewed')">Renewed</button>
+    <button class="qtr-btn" id="rf-On Track"  onclick="setRenewalFilter('status','On Track')">On Track</button>
+    <button class="qtr-btn" id="rf-At Risk"   onclick="setRenewalFilter('status','At Risk')">At Risk</button>
+    <button class="qtr-btn" id="rf-Churned"   onclick="setRenewalFilter('status','Churned')">Churned</button>
+    <span style="margin:0 8px;color:var(--border)">|</span>
+    <span class="qtr-filter-label">Health</span>
+    <button class="qtr-btn" id="rf-h0" onclick="setRenewalFilter('health',0)">0–30</button>
+    <button class="qtr-btn" id="rf-h1" onclick="setRenewalFilter('health',1)">31–50</button>
+    <button class="qtr-btn" id="rf-h2" onclick="setRenewalFilter('health',2)">51–70</button>
+    <button class="qtr-btn" id="rf-h3" onclick="setRenewalFilter('health',3)">71–85</button>
+    <button class="qtr-btn" id="rf-h4" onclick="setRenewalFilter('health',4)">86–100</button>
+    <span class="qtr-clear" id="rf-clear" onclick="setRenewalFilter('clear',null)">✕ Clear filter</span>
+  </div>
   <div class="kpi-row">
     <div class="kpi" style="--kpi-color: #4ade80">
       <div class="kpi-label">Gross Renewal Rate</div>
@@ -702,9 +722,9 @@
     </div>
   </div>
 
-  <div class="table-card">
+  <div class="table-card" id="renewal-main-table">
     <div class="table-header">
-      <div class="table-title">🚨 At-Risk & Churned Accounts</div>
+      <div class="table-title" id="renewal-table-title">📋 All Accounts</div>
     </div>
     <div style="overflow-x:auto">
       <table>
@@ -723,29 +743,6 @@
           </tr>
         </thead>
         <tbody id="risk-table-body"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="table-card">
-    <div class="table-header">
-      <div class="table-title">✅ FY2027 On Track Accounts</div>
-    </div>
-    <div style="overflow-x:auto">
-      <table>
-        <thead>
-          <tr id="ontrack-thead">
-            <th onclick="sortTable('ontrack-table-body','ontrack-thead',0,'str')">Account</th>
-            <th onclick="sortTable('ontrack-table-body','ontrack-thead',1,'str')">Segment</th>
-            <th onclick="sortTable('ontrack-table-body','ontrack-thead',2,'str')">Region</th>
-            <th onclick="sortTable('ontrack-table-body','ontrack-thead',3,'str')">CSM</th>
-            <th onclick="sortTable('ontrack-table-body','ontrack-thead',4,'num')">ARR</th>
-            <th onclick="sortTable('ontrack-table-body','ontrack-thead',5,'num')">Health</th>
-            <th onclick="sortTable('ontrack-table-body','ontrack-thead',6,'num')">Days Since Login</th>
-            <th onclick="sortTable('ontrack-table-body','ontrack-thead',7,'str')">Status</th>
-          </tr>
-        </thead>
-        <tbody id="ontrack-table-body"></tbody>
       </table>
     </div>
   </div>
@@ -981,63 +978,69 @@ function initBookings() {
 }
 
 // ===== RENEWALS =====
-function initRenewals() {
-  const r = filtered(RAW.renewals);
-  const fy26 = r.filter(d => d['Fiscal Year']==='FY26');
-  const fy26Renewed = fy26.filter(d => d['Renewal Status']==='Renewed');
-  const fy26Churned = fy26.filter(d => d['Renewal Status']==='Churned');
-  const grr = fy26Renewed.reduce((s,d) => s+d.renewal_arr, 0) / fy26.reduce((s,d) => s+d.curr_arr, 0);
-  const churnArr = fy26Churned.reduce((s,d) => s+d.curr_arr, 0);
-  const atRisk = r.filter(d => d['Renewal Status']==='At Risk');
-  const atRiskArr = atRisk.reduce((s,d) => s+d.curr_arr, 0);
-  const avgHealth = r.reduce((s,d) => s+d.health, 0) / r.length;
-
-  document.getElementById('r-grr').textContent = pct(grr);
-  document.getElementById('r-churn-arr').textContent = fmt(churnArr);
-  document.getElementById('r-churn-count').textContent = fy26Churned.length;
-  document.getElementById('r-risk-arr').textContent = fmt(atRiskArr);
-  document.getElementById('r-risk-count').textContent = atRisk.length;
-  document.getElementById('r-avg-health').textContent = avgHealth.toFixed(0);
-
-  // Status ARR chart
+function setRenewalFilter(type, value) {
   const statuses = ['Renewed','On Track','At Risk','Churned'];
-  const statusColors = ['rgba(74,222,128,0.8)','rgba(96,165,250,0.8)','rgba(250,204,21,0.8)','rgba(248,113,113,0.8)'];
-  const statusArr = statuses.map(s => r.filter(d => d['Renewal Status']===s).reduce((a,d) => a+d.curr_arr, 0));
-  const renewalStatusChart = chartRegistry['renewal-status'] = new Chart(document.getElementById('chart-renewal-status'), {
-    type: 'bar',
-    data: { labels: statuses, datasets: [{ data: statusArr, backgroundColor: statusColors, borderRadius: 6 }] },
-    options: { ...CHART_DEFAULTS, indexAxis: 'y', scales: { x: { ...CHART_DEFAULTS.scales.y, grid: { color: '#1e2330' } }, y: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 12 } } } } }
-  });
-  const renewalCols = [
-    { key: 'Account Name', label: 'Account', render: row => `<span style="font-weight:600">${row['Account Name']}</span>` },
-    { key: 'Segment', label: 'Segment' },
-    { key: 'Region', label: 'Region' },
-    { key: 'CSM', label: 'CSM' },
-    { key: 'curr_arr', label: 'ARR', render: row => `<span style="color:var(--accent);font-weight:700">${fmt(row.curr_arr)}</span>` },
-    { key: 'health', label: 'Health', render: row => {
-      const c = row.health >= 75 ? '#4ade80' : row.health >= 50 ? '#facc15' : '#f87171';
-      return `<span style="font-family:'DM Mono',monospace;color:${c}">${row.health}</span>`;
-    }},
-    { key: 'support_tickets', label: 'Tickets', render: row => `<span style="font-family:'DM Mono',monospace;color:${row.support_tickets>5?'#f87171':'var(--muted)'}">${row.support_tickets}</span>` },
-    { key: 'days_login', label: 'Days Since Login', render: row => `<span style="font-family:'DM Mono',monospace;color:${row.days_login>30?'#f87171':'var(--muted)'}">${row.days_login}d</span>` },
-    { key: 'Fiscal Year', label: 'FY', render: row => `<span class="pill pill-blue" style="font-size:10px">${row['Fiscal Year']}</span>` },
-  ];
-  renewalStatusChart.options.onClick = (evt, elements) => {
-    if (!elements.length) return;
-    const status = statuses[elements[0].index];
-    const rows = r.filter(d => d['Renewal Status']===status).sort((a,b) => b.curr_arr - a.curr_arr);
-    const total = rows.reduce((s,d)=>s+d.curr_arr,0);
-    const segLabel = activeSegment === 'All' ? 'All fiscal years' : `${activeSegment} · all fiscal years`;
-    openModal(`${status} Accounts`, `${rows.length} accounts · ${segLabel}`, rows, renewalCols, [
-      { label: 'Accounts', value: rows.length },
-      { label: 'Total ARR', value: fmt(total) },
-      { label: 'Avg ARR', value: rows.length ? fmt(total/rows.length) : '—' },
-    ]);
-  };
-  renewalStatusChart.update();
+  const healthIds = ['rf-h0','rf-h1','rf-h2','rf-h3','rf-h4'];
 
-  // Health distribution
-  const buckets = ['0-30','31-50','51-70','71-85','86-100'];
+  if (type === 'clear') {
+    activeRenewalStatus = null;
+    activeHealthBucket = null;
+    [...statuses.map(s=>`rf-${s}`), ...healthIds].forEach(id => {
+      const el = document.getElementById(id); if(el) el.classList.remove('active');
+    });
+    const clr = document.getElementById('rf-clear'); if(clr) clr.classList.remove('visible');
+  } else if (type === 'status') {
+    // Toggle
+    activeRenewalStatus = activeRenewalStatus === value ? null : value;
+    activeHealthBucket = null; // clear health filter
+    healthIds.forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('active'); });
+    statuses.forEach(s => {
+      const el = document.getElementById(`rf-${s}`);
+      if(el) el.classList.toggle('active', s === activeRenewalStatus);
+    });
+  } else if (type === 'health') {
+    // Toggle
+    activeHealthBucket = activeHealthBucket === value ? null : value;
+    activeRenewalStatus = null; // clear status filter
+    statuses.forEach(s => { const el = document.getElementById(`rf-${s}`); if(el) el.classList.remove('active'); });
+    healthIds.forEach((id, i) => {
+      const el = document.getElementById(id); if(el) el.classList.toggle('active', i === activeHealthBucket);
+    });
+  }
+
+  const anyActive = activeRenewalStatus !== null || activeHealthBucket !== null;
+  const clr = document.getElementById('rf-clear'); if(clr) clr.classList.toggle('visible', anyActive);
+
+  // Highlight bar charts
+  updateRenewalChartHighlights();
+  redrawRenewals();
+}
+
+function updateRenewalChartHighlights() {
+  const statuses = ['Renewed','On Track','At Risk','Churned'];
+  const statusChart = chartRegistry['renewal-status'];
+  if (statusChart) {
+    statusChart.data.datasets[0].backgroundColor = statuses.map((s, i) => {
+      const base = ['rgba(74,222,128,','rgba(96,165,250,','rgba(250,204,21,','rgba(248,113,113,'][i];
+      if (activeRenewalStatus === null) return base + '0.8)';
+      return s === activeRenewalStatus ? base + '1)' : base + '0.2)';
+    });
+    statusChart.update('none');
+  }
+  const healthChart = chartRegistry['health-dist'];
+  if (healthChart) {
+    const baseColors = ['rgba(248,113,113,','rgba(251,146,60,','rgba(250,204,21,','rgba(74,222,128,','rgba(74,222,128,'];
+    const baseAlpha = ['0.8','0.8','0.8','0.6','0.9'];
+    healthChart.data.datasets[0].backgroundColor = baseColors.map((c, i) => {
+      if (activeHealthBucket === null) return c + baseAlpha[i] + ')';
+      return i === activeHealthBucket ? c + '1)' : c + '0.15)';
+    });
+    healthChart.update('none');
+  }
+}
+
+function filteredRenewals() {
+  let r = filtered(RAW.renewals);
   const bucketFilters = [
     d => d.health <= 30,
     d => d.health > 30 && d.health <= 50,
@@ -1045,7 +1048,82 @@ function initRenewals() {
     d => d.health > 70 && d.health <= 85,
     d => d.health > 85,
   ];
-  const bucketCounts = bucketFilters.map(fn => r.filter(fn).length);
+  if (activeRenewalStatus) r = r.filter(d => d['Renewal Status'] === activeRenewalStatus);
+  if (activeHealthBucket !== null) r = r.filter(bucketFilters[activeHealthBucket]);
+  return r;
+}
+
+function redrawRenewals() {
+  const r = filteredRenewals();
+  const bucketLabels = ['0-30','31-50','51-70','71-85','86-100'];
+
+  // KPIs — always show from full segment-filtered data for context
+  const allR = filtered(RAW.renewals);
+  const fy26 = allR.filter(d => d['Fiscal Year']==='FY26');
+  const fy26Renewed = fy26.filter(d => d['Renewal Status']==='Renewed');
+  const fy26Churned = fy26.filter(d => d['Renewal Status']==='Churned');
+  const grr = fy26.length ? fy26Renewed.reduce((s,d) => s+d.renewal_arr, 0) / fy26.reduce((s,d) => s+d.curr_arr, 0) : 0;
+  const churnArr = fy26Churned.reduce((s,d) => s+d.curr_arr, 0);
+  const atRisk = allR.filter(d => d['Renewal Status']==='At Risk');
+  const atRiskArr = atRisk.reduce((s,d) => s+d.curr_arr, 0);
+  const avgHealth = allR.length ? allR.reduce((s,d) => s+d.health, 0) / allR.length : 0;
+  document.getElementById('r-grr').textContent = pct(grr);
+  document.getElementById('r-churn-arr').textContent = fmt(churnArr);
+  document.getElementById('r-churn-count').textContent = fy26Churned.length;
+  document.getElementById('r-risk-arr').textContent = fmt(atRiskArr);
+  document.getElementById('r-risk-count').textContent = atRisk.length;
+  document.getElementById('r-avg-health').textContent = avgHealth.toFixed(0);
+
+  // Table title
+  const tableTitle = document.getElementById('renewal-table-title');
+  if (tableTitle) {
+    if (activeRenewalStatus) tableTitle.textContent = `${activeRenewalStatus === 'At Risk' || activeRenewalStatus === 'Churned' ? '🚨' : '✅'} ${activeRenewalStatus} Accounts (${r.length})`;
+    else if (activeHealthBucket !== null) tableTitle.textContent = `🩺 Health Score ${bucketLabels[activeHealthBucket]} Accounts (${r.length})`;
+    else tableTitle.textContent = `📋 All Accounts (${r.length})`;
+  }
+
+  // Table rows — unified, all statuses
+  const sorted = [...r].sort((a,b) => b.curr_arr - a.curr_arr);
+  document.getElementById('risk-table-body').innerHTML = sorted.map(d => `<tr>
+    <td style="font-weight:600">${d['Account Name']}</td>
+    <td>${d.Segment}</td><td>${d.Region}</td><td>${d.CSM}</td>
+    <td style="color:${['At Risk','Churned'].includes(d['Renewal Status'])?'var(--danger)':'var(--accent)'};font-weight:700">${fmt(d.curr_arr)}</td>
+    <td><div class="health-bar"><div class="health-bar-bg"><div class="health-bar-fill" style="width:${d.health}%;background:${healthColor(d.health)}"></div></div><span style="font-family:'DM Mono',monospace;font-size:11px;color:${healthColor(d.health)}">${d.health}</span></div></td>
+    <td style="font-family:'DM Mono',monospace;color:${d.support_tickets>5?'#f87171':'var(--text)'}">${d.support_tickets}</td>
+    <td style="font-family:'DM Mono',monospace;color:${d.days_login>30?'#f87171':'var(--text)'}">${d.days_login}d</td>
+    <td>${statusPill(d['Renewal Status'])}</td>
+    <td><span class="pill pill-blue" style="font-size:10px">${d['Fiscal Year']}</span></td>
+  </tr>`).join('');
+}
+
+function initRenewals() {
+  const allR = filtered(RAW.renewals);
+  const statuses = ['Renewed','On Track','At Risk','Churned'];
+  const statusColors = ['rgba(74,222,128,0.8)','rgba(96,165,250,0.8)','rgba(250,204,21,0.8)','rgba(248,113,113,0.8)'];
+  const statusArr = statuses.map(s => allR.filter(d => d['Renewal Status']===s).reduce((a,d) => a+d.curr_arr, 0));
+
+  // Status bar chart
+  const renewalStatusChart = chartRegistry['renewal-status'] = new Chart(document.getElementById('chart-renewal-status'), {
+    type: 'bar',
+    data: { labels: statuses, datasets: [{ data: statusArr, backgroundColor: [...statusColors], borderRadius: 6 }] },
+    options: { ...CHART_DEFAULTS, indexAxis: 'y', scales: { x: { ...CHART_DEFAULTS.scales.y, grid: { color: '#1e2330' } }, y: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 12 } } } } }
+  });
+  renewalStatusChart.options.onClick = (evt, elements) => {
+    if (!elements.length) return;
+    setRenewalFilter('status', statuses[elements[0].index]);
+  };
+  renewalStatusChart.update();
+
+  // Health distribution chart
+  const bucketFilters = [
+    d => d.health <= 30,
+    d => d.health > 30 && d.health <= 50,
+    d => d.health > 50 && d.health <= 70,
+    d => d.health > 70 && d.health <= 85,
+    d => d.health > 85,
+  ];
+  const buckets = ['0-30','31-50','51-70','71-85','86-100'];
+  const bucketCounts = bucketFilters.map(fn => allR.filter(fn).length);
   const healthDistChart = chartRegistry['health-dist'] = new Chart(document.getElementById('chart-health-dist'), {
     type: 'bar',
     data: { labels: buckets, datasets: [{ data: bucketCounts, backgroundColor: ['rgba(248,113,113,0.8)','rgba(251,146,60,0.8)','rgba(250,204,21,0.8)','rgba(74,222,128,0.6)','rgba(74,222,128,0.9)'], borderRadius: 6 }] },
@@ -1053,40 +1131,13 @@ function initRenewals() {
   });
   healthDistChart.options.onClick = (evt, elements) => {
     if (!elements.length) return;
-    const bi = elements[0].index;
-    const rows = r.filter(bucketFilters[bi]).sort((a,b) => b.curr_arr - a.curr_arr);
-    const segLabel = activeSegment === 'All' ? '' : ` · ${activeSegment}`;
-    openModal(`Health Score ${buckets[bi]}${segLabel}`, `${rows.length} accounts in this range`, rows, renewalCols, [
-      { label: 'Accounts', value: rows.length },
-      { label: 'Total ARR', value: fmt(rows.reduce((s,d)=>s+d.curr_arr,0)) },
-      { label: 'Avg Health', value: rows.length ? (rows.reduce((s,d)=>s+d.health,0)/rows.length).toFixed(0) : '—' },
-    ]);
+    setRenewalFilter('health', elements[0].index);
   };
   healthDistChart.update();
 
-  // At Risk + Churned table
-  const riskAccounts = r.filter(d => ['At Risk','Churned'].includes(d['Renewal Status'])).sort((a,b) => b.curr_arr - a.curr_arr);
-  document.getElementById('risk-table-body').innerHTML = riskAccounts.map(d => `<tr>
-    <td style="font-weight:600">${d['Account Name']}</td>
-    <td>${d.Segment}</td><td>${d.Region}</td><td>${d.CSM}</td>
-    <td style="color:var(--danger);font-weight:700">${fmt(d.curr_arr)}</td>
-    <td><div class="health-bar"><div class="health-bar-bg"><div class="health-bar-fill" style="width:${d.health}%;background:${healthColor(d.health)}"></div></div><span style="font-family:'DM Mono',monospace;font-size:11px;color:${healthColor(d.health)}">${d.health}</span></div></td>
-    <td style="font-family:'DM Mono',monospace;color:${d.support_tickets>5?'#f87171':'var(--text)'}">${d.support_tickets}</td>
-    <td style="font-family:'DM Mono',monospace;color:${d.days_login>30?'#f87171':'var(--text)'}">${d.days_login}d</td>
-    <td>${statusPill(d['Renewal Status'])}</td>
-    <td><span class="pill pill-blue" style="font-size:10px">${d['Fiscal Year']}</span></td>
-  </tr>`).join('');
-
-  // On Track table
-  const onTrack = r.filter(d => d['Renewal Status']==='On Track').sort((a,b) => b.curr_arr - a.curr_arr);
-  document.getElementById('ontrack-table-body').innerHTML = onTrack.map(d => `<tr>
-    <td style="font-weight:600">${d['Account Name']}</td>
-    <td>${d.Segment}</td><td>${d.Region}</td><td>${d.CSM}</td>
-    <td style="color:var(--accent);font-weight:700">${fmt(d.curr_arr)}</td>
-    <td><div class="health-bar"><div class="health-bar-bg"><div class="health-bar-fill" style="width:${d.health}%;background:${healthColor(d.health)}"></div></div><span style="font-family:'DM Mono',monospace;font-size:11px;color:${healthColor(d.health)}">${d.health}</span></div></td>
-    <td style="font-family:'DM Mono',monospace">${d.days_login}d</td>
-    <td>${statusPill(d['Renewal Status'])}</td>
-  </tr>`).join('');
+  // Re-apply highlights if filters were previously set
+  updateRenewalChartHighlights();
+  redrawRenewals();
 }
 
 // ===== PIPELINE =====
@@ -1425,7 +1476,9 @@ function switchTab(name, btn) {
 
 // ===== SEGMENT + QUARTER FILTERS =====
 let activeSegment = 'All';
-let activeQuarter = null; // null = all quarters
+let activeQuarter = null;
+let activeRenewalStatus = null;  // null = all, or e.g. 'On Track'
+let activeHealthBucket = null;   // null = all, or index 0-4
 const chartRegistry = {};
 
 function filtered(dataset) {
@@ -1572,9 +1625,14 @@ function setSegment(seg) {
 
   // Reset quarter filter when segment changes
   activeQuarter = null;
+  activeRenewalStatus = null;
+  activeHealthBucket = null;
   const quarters2 = ['2026-Q1','2026-Q2','2026-Q3','2026-Q4','2027-Q1'];
   quarters2.forEach(qi => { const b = document.getElementById(`qtr-${qi}`); if(b) b.classList.remove('active'); });
   const clr = document.getElementById('qtr-clear'); if(clr) clr.classList.remove('visible');
+  ['Renewed','On Track','At Risk','Churned'].forEach(s => { const el = document.getElementById(`rf-${s}`); if(el) el.classList.remove('active'); });
+  ['rf-h0','rf-h1','rf-h2','rf-h3','rf-h4'].forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('active'); });
+  const rfClr = document.getElementById('rf-clear'); if(rfClr) rfClr.classList.remove('visible');
 
   // Destroy all registered charts
   Object.keys(chartRegistry).forEach(k => {
@@ -1605,6 +1663,20 @@ function openModal(title, subtitle, rows, columns, stats) {
   document.getElementById('modal-body').innerHTML = `<table>${thead}${tbody}</table>`;
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+
+  // Wire sortable headers
+  const numKeywords = ['arr','weighted','age','days','quota','deal','logo','expansion','attain','ticket','health','count','period'];
+  const modalThead = document.querySelector('#modal-body thead tr');
+  const modalTbody = document.querySelector('#modal-body tbody');
+  if (modalThead && modalTbody) {
+    modalTbody.id = 'modal-sort-body';
+    modalThead.id = 'modal-sort-thead';
+    modalThead.querySelectorAll('th').forEach((th, i) => {
+      const type = numKeywords.some(k => th.textContent.toLowerCase().includes(k)) ? 'num' : 'str';
+      th.style.cursor = 'pointer';
+      th.onclick = () => sortTable('modal-sort-body', 'modal-sort-thead', i, type);
+    });
+  }
 }
 function closeModal(e, force) {
   if (force || (e && e.target === document.getElementById('modal-overlay'))) {
@@ -1783,29 +1855,6 @@ function sortTable(tbodyId, theadId, colIdx, type) {
   });
 
   rows.forEach(r => tbody.appendChild(r));
-}
-
-// Make modal tables sortable when opened
-const _origOpenModal = openModal;
-function openModal(title, subtitle, rows, columns, stats) {
-  _origOpenModal(title, subtitle, rows, columns, stats);
-  // Wire up sortable headers in modal after render
-  setTimeout(() => {
-    const modalThead = document.querySelector('#modal-body thead tr');
-    const modalTbody = document.querySelector('#modal-body tbody');
-    if (!modalThead || !modalTbody) return;
-    modalTbody.id = 'modal-sort-body';
-    modalThead.id = 'modal-sort-thead';
-    // Infer type from column label
-    const numKeywords = ['arr','arR','weighted','age','days','quota','deal','logo','expansion','attain','ticket','health','count','period'];
-    modalThead.querySelectorAll('th').forEach((th, i) => {
-      const label = th.textContent.toLowerCase();
-      const type = numKeywords.some(k => label.includes(k)) ? 'num' : 'str';
-      th.style.cursor = 'pointer';
-      th.style.userSelect = 'none';
-      th.onclick = () => sortTable('modal-sort-body','modal-sort-thead', i, type);
-    });
-  }, 50);
 }
 
 // ===== INIT =====
